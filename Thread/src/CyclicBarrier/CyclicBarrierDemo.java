@@ -16,13 +16,13 @@ import java.util.concurrent.TimeUnit;
  * CyclicBarrier初始时还可带一个Runnable的参数， 此Runnable任务在CyclicBarrier的数目达到后，所有其它线程被唤醒前被执行
  * 添加马-》到达数量-》打印栅栏和马的步数-》马醒来-》继续等待
  * ./Concurrency/New Library Components
+ * 
  */
 class Horse implements Runnable
 {
 	private static int counter=0;
 	private final int id=counter++;
 	private int strides=0;
-	private static Random random=new Random(47);
 	private static CyclicBarrier barrier;
 	public Horse(CyclicBarrier cb)
 	{
@@ -42,7 +42,7 @@ class Horse implements Runnable
 			{
 				synchronized(this)
 				{
-					strides+=random.nextInt(3);
+					strides+=new Random(47).nextInt(3);
 				}
 				barrier.await();
 			}
@@ -77,8 +77,6 @@ public class CyclicBarrierDemo
 	private List<Horse> horses=new ArrayList<Horse>();
 	private ExecutorService exec=Executors.newCachedThreadPool();
 	private CyclicBarrier barrier;
-	
-	
 	public CyclicBarrierDemo(int nHorses)
 	{
 		barrier=new CyclicBarrier(nHorses,new Runnable(){
@@ -104,7 +102,6 @@ public class CyclicBarrierDemo
 						return;
 					}
 				}
-				
 			}
 		});
 		
@@ -119,9 +116,6 @@ public class CyclicBarrierDemo
 	public static void main(String args[])
 	{
 		int nHorses=5;
-		
-		
 		new CyclicBarrierDemo(nHorses);
-		
 	}
 }
