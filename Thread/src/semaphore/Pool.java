@@ -30,7 +30,7 @@ public class Pool<T>
 	
 	public T checkOut() throws InterruptedException
 	{
-		available.acquire();
+		available.acquire();//在这里如果无法获得信号量，线程将被阻止
 		return getItem();
 	}
 	
@@ -38,7 +38,7 @@ public class Pool<T>
 	{
 		if(releaseItem(x))
 		{
-			available.release();
+			available.release();//释放出信号量
 		}
 	}
 	
