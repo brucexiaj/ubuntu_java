@@ -1,6 +1,7 @@
 package restaruantSimulation;
 
 import java.util.ArrayList;
+
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
@@ -9,14 +10,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
+/**
+ * 这是一个模拟饭店营业的流程，主要测试了几个涉及线程的队列的使用
+ * @author brucexiajun
+ * SynchronousQueue,BlockingQueue,
+ * 顾客下单->服务员取走单子->厨师收到订单->查看订单的食物->厨师做食物->通知服务员取食物->服务员将食物拿给顾客->顾客享用食物
+ * 用a到j标示了整个流程
+ *./Concurrency/Simulation/The restaurant simulation
+ */
 
-import semaphore.Fat;
-import semaphore.Pool;
 
 class Order
 {
-	private static int counter=0;
-	private final int id=counter++;
+	
 	private Customer customer;
 	private WaitPerson wp;
 	private Food food;
@@ -40,10 +46,7 @@ class Order
 		return wp;
 
 	}
-	public String toString()
-	{
-		return "Order:"+id+" item:"+food+" for:"+customer+"Served by "+wp;
-	}
+	
 }
 
 class Plate
@@ -76,12 +79,13 @@ class Customer implements Runnable
 	private static int counter=0;
 	private final int id=counter++;
 	private final WaitPerson wp;
-	private SynchronousQueue<Plate> placeSetting=new SynchronousQueue<Plate>();
+	private SynchronousQueue<Plate> placeSetting=new SynchronousQueue<Plate>();//这个队列每次只能放一个对象
 	public Customer(WaitPerson wp)
 	{
 		this.wp=wp;
 	}
-	public void deliver(Plate p)throws Exception
+	//服务员将食物发放给顾客
+	public void deliver(Plate p)throws InterruptedException
 	{
 		placeSetting.put(p);
 	}
@@ -92,16 +96,18 @@ class Customer implements Runnable
 			Food food=course.randomSelection();
 			try
 			{
-				wp.placeOrder(this,food);
-				System.out.println(this+" eating "+placeSetting.take());
+				wp.placeOrder(this,food);//a.顾客下订单，将单子交给服务员
+				//j.顾客拿到食物，开始享用。
+				System.out.println(this+" 正在吃 "+placeSetting.take());//如果食物没有做好，会被阻塞
+				
 			}
-			catch(Exception e)
+			catch(InterruptedException e)
 			{
-				System.out.println(this+"waitting for "+course+"interrupted.");
+				System.out.println(this+" 等待 "+food+" 中断了");
 				break;
 			}
 		}
-		System.out.println(this+"finished meal,leaving");
+		System.out.println(this+" 吃完了食物，离开了");
 	}
 	
 	public String toString()
@@ -115,10 +121,10 @@ class WaitPerson implements Runnable
 	private static int counter=0;
 	private final int id=counter++;
 	private final Restaurant restaurant;
-	BlockingQueue<Plate> filledOrders=new LinkedBlockingQueue<Plate>();
+	BlockingQueue<Plate> filledOrders=new LinkedBlockingQueue<Plate>();//这个队列没有大小限制
 	public WaitPerson(Restaurant restaurant)
 	{
-		super();
+	
 		this.restaurant = restaurant;
 	}
 	
@@ -126,11 +132,12 @@ class WaitPerson implements Runnable
 	{
 		try
 		{
+			//b.服务员将单子交给厨师
 			restaurant.orders.put(new Order(c,this,f));
 		}
 		catch(Exception e)
 		{
-			System.out.println(this+"placeOrder interrupted.");
+			System.out.println(this+" placeOrder interrupted.");
 			
 		}
 	}
@@ -141,16 +148,19 @@ class WaitPerson implements Runnable
 		{
 			while(!Thread.interrupted())
 			{
-				Plate plate=filledOrders.take();
-				System.out.println(this+"拿到了 "+plate+"，分发给 "+plate.getOrder().getCustomer());
+				//h.服务员取走完成的订单
+				Plate plate=filledOrders.take();//这里会被阻塞
+				System.out.println(this+"拿到了 "+plate+"，这是发给 "+plate.getOrder().getCustomer()+"的食物");
+				//i.将完成的订单（食物）送到顾客手中
+				plate.getOrder().getCustomer().deliver(plate);
 			}
 		}
 		catch(Exception e)
 		{
-			System.out.println(this+"interrupted.");
+			System.out.println(this+" interrupted.");
 			
 		}
-		System.out.println(this+"off duty.");
+		System.out.println(this+" off duty.");
 	}
 	
 	public String toString()
@@ -178,11 +188,16 @@ class Chef implements Runnable
 		{
 			while(!Thread.interrupted())
 			{
-				Order order=restaurant.orders.take();
+				//c.厨师取下订单
+				Order order=restaurant.orders.take();//没有订单，这里也会被阻塞
+				//d.查看订单里面的食物
 				Food requestedItem=order.item();
-				TimeUnit.MICROSECONDS.sleep(200);
+				//e.烹制出该食物
+				TimeUnit.MILLISECONDS.sleep(new Random().nextInt(500));
+			    //f.将食物放到盘子里面
 				Plate plate=new Plate(order,requestedItem);
-				order.getWaitPerson().filledOrders.put(plate);
+				//g.通知服务员，同时给完成的订单添加一项，表示厨师完成了一项订单
+				order.getWaitPerson().filledOrders.put(plate);//这里不会被阻塞
 				
 			}
 		}
@@ -206,10 +221,6 @@ class Restaurant implements Runnable
 	private List<Chef> chefs=new ArrayList<Chef>();
 	private ExecutorService exe;
 	BlockingQueue<Order> orders=new LinkedBlockingQueue<Order>();
-	
-	
-	
-	
 	public Restaurant(ExecutorService exe,int nWaitPersons,int nChefs)
 	{
 		this.exe=exe;
@@ -233,10 +244,11 @@ class Restaurant implements Runnable
 		{
 			while(!Thread.interrupted())
 			{
+				//为顾客随机分配一名服务员
 				WaitPerson wp=waitPersons.get(new Random().nextInt(waitPersons.size()));
 				Customer c=new Customer(wp);
 				exe.execute(c);
-				TimeUnit.MICROSECONDS.sleep(100);
+				TimeUnit.MILLISECONDS.sleep(100);
 				
 			}
 		}
@@ -258,7 +270,7 @@ public class SimulateRestaurant
 		ExecutorService exe=Executors.newCachedThreadPool();
 		Restaurant restaurant=new Restaurant(exe,5,2);
 		exe.execute(restaurant);
-		TimeUnit.MILLISECONDS.sleep(100);
+		TimeUnit.SECONDS.sleep(1);
 		exe.shutdownNow();
 	}
 }
