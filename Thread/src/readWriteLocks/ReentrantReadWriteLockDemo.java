@@ -11,7 +11,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 /**
  * 读写锁的使用
- * ./Concurrent/ReadWriteLocks
+ * 这个程序有点问题
+ * ./Concurrent/Performance Tuning/ReadWriteLocks
  * @author brucexiajun
  *1,2读线程都能顺利加上锁，但是3号读线程获得锁之后无法加锁，不是很理解
  */
@@ -64,26 +65,9 @@ class ReaderWriteListTest
 	{
 		 ReentrantReadWriteLock lock=new ReentrantReadWriteLock(true);
 			ExecutorService exec=Executors.newCachedThreadPool();
+			exec.execute(new Writer(lock,1));
 			exec.execute(new Reader(lock,1));
 			
-			try 
-			{
-				TimeUnit.SECONDS.sleep(2);
-				exec.execute(new Reader(lock,2));
-				TimeUnit.MILLISECONDS.sleep(1);
-				exec.execute(new Writer(lock,1));
-				TimeUnit.MILLISECONDS.sleep(1);
-				exec.execute(new Reader(lock,3));
-				TimeUnit.SECONDS.sleep(2);
-				exec.execute(new Writer(lock,2));
-			
-			
-				
-			} 
-			catch (InterruptedException e) 
-			{
-				e.printStackTrace();
-			}
 			
 	}
 }
@@ -93,9 +77,11 @@ public class ReentrantReadWriteLockDemo<T>
 {
 	
 	
-	public static void main(String args[])
+	public static void main(String args[]) throws InterruptedException
 	{
+		
 		new ReaderWriteListTest().test();
+		
 	}
 	
 	
